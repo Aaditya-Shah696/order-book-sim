@@ -1,0 +1,22 @@
+{
+  "simulated": {
+    "label": "simulated ZI market",
+    "n_observations": 19999,
+    "pearson_kurtosis": 3.5861973108232927,
+    "return_acf_lag1": -0.3571939560507963,
+    "return_acf_mean_lag2_plus": -0.005757486303979212,
+    "abs_return_acf_lag1": 0.15022485155161747,
+    "abs_return_acf_lag20": -0.0016552792274133294,
+    "ofi_price_change_corr": 0.06402975607764452
+  },
+  "lobster": {
+    "label": "LOBSTER AAPL 2012-06-21",
+    "n_observations": 118496,
+    "pearson_kurtosis": 17.847641810264914,
+    "return_acf_lag1": -0.27609628979889916,
+    "return_acf_mean_lag2_plus": 0.002849567719816716,
+    "abs_return_acf_lag1": 0.3003370728488791,
+    "abs_return_acf_lag20": 0.10915917042722142,
+    "ofi_price_change_corr": 0.1756199254583646
+  }
+}
