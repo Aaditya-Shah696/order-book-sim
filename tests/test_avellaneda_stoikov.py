@@ -135,14 +135,44 @@ class TestReservationPriceConvergesToMid:
         )
         assert 2 * half_at_T == pytest.approx(2.0 / INFORMED_K_HAT, rel=0.01)
 
-    def test_spread_term_is_inert_after_tick_snapping(self) -> None:
+    def test_spread_floor_alone_snaps_to_naive_quotes(self) -> None:
         """2/k = 3.66 ticks, half 1.83: snapped outward that is the same bid
-        and ask NaiveMM's 2.0 half-spread gives on every mark, so the
-        comparison between the two is a comparison of reservation skews."""
+        and ask NaiveMM's 2.0 half-spread gives on every mark. This is the
+        spread at t = T, where the variance term has decayed to zero."""
         mm = _make_as_mm()
         naive = _make_naive()
         for mark in (100.0, 100.5, 1000.0, 1000.5):
             snapshot = Snapshot(t=T, best_bid=None, best_ask=None, mark=mark, my_orders=())
+            assert mm.snap(*mm.quote(snapshot)) == naive.snap(*naive.quote(snapshot))
+
+    def test_variance_term_widens_the_quote_by_a_tick_for_the_first_half_of_the_session(
+        self,
+    ) -> None:
+        """The spread also carries gamma*sigma^2*(T-t). At the chosen gamma
+        the half-spread is 2.14 at the open and crosses below 2.0 only
+        around tick 900, so until then A-S quotes a tick wider on each side
+        than NaiveMM at every integer mark (half-integer marks snap the
+        same either way). An earlier version of this file asserted the
+        spread term was inert; it is only inert in the t -> T limit."""
+        mm = _make_as_mm()
+        naive = _make_naive()
+        floor_half = mm.quote(Snapshot(t=T, best_bid=None, best_ask=None, mark=0.0, my_orders=()))[1]
+        crossover = T - (2 * 2.0 - 2 * floor_half) / (mm.gamma * mm.sigma**2)
+        assert 850 < crossover < 1000
+
+        _, half_at_open = mm.quote(FLAT_SNAPSHOT)
+        assert 2.1 < half_at_open < 2.2
+
+        for t, mark, wider in ((0, 1000.0, True), (500, 1000.0, True), (1500, 1000.0, False)):
+            snapshot = Snapshot(t=t, best_bid=None, best_ask=None, mark=mark, my_orders=())
+            as_bid, as_ask = mm.snap(*mm.quote(snapshot))
+            nv_bid, nv_ask = naive.snap(*naive.quote(snapshot))
+            if wider:
+                assert (as_bid, as_ask) == (nv_bid - 1, nv_ask + 1)
+            else:
+                assert (as_bid, as_ask) == (nv_bid, nv_ask)
+        for t in (0, 500, 1500):
+            snapshot = Snapshot(t=t, best_bid=None, best_ask=None, mark=1000.5, my_orders=())
             assert mm.snap(*mm.quote(snapshot)) == naive.snap(*naive.quote(snapshot))
 
 

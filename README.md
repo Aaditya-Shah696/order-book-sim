@@ -32,7 +32,7 @@ uv run mypy src/lob_simulator tests
 uv run ruff check .
 ```
 
-243 tests, about 5 minutes. mypy runs strict and
+256 tests, about 3 to 5 minutes. mypy runs strict and
 clean. All three gates run in CI (`.github/workflows/ci.yml`) on Linux and
 Windows, Python 3.11 and 3.14.
 
@@ -48,6 +48,7 @@ uv run python scripts/run_gamma_sweep.py --market informed   # picks gamma and s
 uv run python scripts/run_monte_carlo.py --market uninformed # 500-seed comparison (~20 min)
 uv run python scripts/run_monte_carlo.py --market informed   # 500-seed comparison (~20 min)
 uv run python scripts/run_inventory_path.py                  # |inventory| through the session (~4 min)
+uv run python scripts/run_spread_decomposition.py --market informed  # A-S spread vs skew schedule (~15 min)
 uv run python scripts/fetch_lobster_sample.py                # ~7.6 MB of real AAPL data
 uv run python scripts/run_stylized_facts.py                  # simulated vs real, matched clock
 uv run python scripts/run_market_impact.py                   # market-share sweep (~40 min)
@@ -95,6 +96,9 @@ research/monte_carlo.py      batch runner, terminal-PnL rule, fill markouts,
                              bootstrap CIs
 research/inventory_path.py   |inventory| at every tick, across seeds
 research/gamma_sweep.py      gamma chosen by a stated rule on stated seeds
+research/spread_decomposition.py
+                             A-S with its spread pinned or its variance term
+                             dropped, paired against the heuristic seed by seed
 research/stylized_facts.py   kurtosis, ACF, order-flow imbalance; takes plain arrays
 research/lobster.py          loads a real LOBSTER sample; resamples event time to
                              the simulator's tick clock
@@ -325,6 +329,20 @@ values sit where PnL dispersion bottoms out before that happens. Because
 the choice is by a stated rule on held-out seeds, it is a fit, not a
 derivation from an independent risk-aversion argument.
 
+**The argmax is noisy; the ordering is not.** Sixty seeds give the std
+estimate a relative standard error of about 9%, so each mean-over-std
+figure carries roughly 10% noise. On the informed market the heuristic's
+score is non-monotone in skew_k (19.9 at 0.1, 15.8 at 0.15, 20.8 at 0.2),
+so picking 0.2 over 0.1 is within noise, and A-S's peak at 7e-5 (15.7)
+stands 25% above both neighbours (12.5 at 5e-5, 12.7 at 1e-4) on a grid
+dense enough that a real optimum would not look like a spike. Under other
+rules the picks move: maximising mean minus one or two standard deviations
+picks gamma 2e-5 and skew_k 0.1. What does not move is the comparison: no
+A-S row beats the best heuristic row on mean over std on either market
+under any of those rules. The chosen values should be read as one draw
+from a noisy argmax; the finding in Result 4 does not depend on which
+draw.
+
 **On the uninformed market A-S is a spread quoter with a small lean.** The
 chosen gamma gives 0.05 ticks per unit at the open, decaying to zero.
 Below gamma 3e-6 the shift is under 0.003 ticks per unit and the quotes are
@@ -371,8 +389,13 @@ the only risk is mark-to-market noise on whatever inventory has accumulated.
 
 The heuristic's swept skew_k of 0.15 buys the lowest std and the tightest
 inventory with 1,700 of mean PnL; A-S at its swept gamma leans so little
-(0.05 ticks per unit at the open) that it is NaiveMM with a slightly wider
-quote and a slow drift back to flat. On mean over std the two are tied.
+(0.05 ticks per unit at the open) that it is NaiveMM with a wider quote
+and a slow drift back to flat. The wider quote is not slight: on this
+market `2/k = 4.30` ticks, half 2.15, which snaps to one tick outside
+NaiveMM's bid and ask at every integer mark for the whole session (the
+same at half-integer marks). That is why A-S fills 470 fewer times than
+NaiveMM here with no skew to speak of. On mean over std the two tuned
+strategies are tied.
 
 **4b. Informed market** (gamma 7e-05, skew_k 0.2). The comparison the
 strategies were built for.
@@ -428,15 +451,44 @@ Three things to read off the informed-market tables:
   open, so one 5-unit fill moves the far quote 3 ticks and through the mid,
   and A-S fills 178 units a session as aggressor (the heuristic 20, NaiveMM
   1). That is how it holds mid-session inventory at 2 to 3 units (Result
-  5), and it is a cost, not an edge. The optimal-spread term is inert:
-  `2/k = 3.66` ticks, half 1.83, snaps outward to the same bid and ask as
-  NaiveMM's 2.0 on every mark, so the whole comparison is a comparison of
-  reservation skews, and on this market a constant 0.1 to 0.2 ticks per
-  unit does what A-S's time-varying one does with no calibration, no
-  horizon and no end-of-session inventory release. An earlier version of
-  this section, comparing against a hand-picked skew_k of 0.05, led with
-  A-S having the lowest std of the three; that ordering was a property of
-  tuning one strategy and not the other.
+  5), and it is a cost, not an edge. On this market a constant 0.1 to 0.2
+  ticks per unit does what A-S's time-varying skew does with no
+  calibration, no horizon and no end-of-session inventory release. An
+  earlier version of this section, comparing against a hand-picked skew_k
+  of 0.05, led with A-S having the lowest std of the three; that ordering
+  was a property of tuning one strategy and not the other.
+
+A-S also differs from the heuristic in its spread, and an earlier version
+of this section called that difference inert: `2/k = 3.66` ticks, half
+1.83, snaps outward to NaiveMM's 2.0 quotes on every mark. That is true
+only at the horizon. The spread carries the same `gamma * sigma^2 * (T - t)`
+term as the reservation price, so at the chosen gamma the half-spread is
+2.14 at the open and crosses below 2.0 only around tick 900; until then
+A-S quotes a tick outside NaiveMM's bid and ask at every integer mark. To
+find out whether that, rather than the skew schedule, is what costs A-S
+against the heuristic, `scripts/run_spread_decomposition.py` runs two A-S
+variants on 200 fresh seeds (20,000 to 20,199), paired seed by seed against
+the heuristic: one with the half-spread pinned to NaiveMM's 2.0, one with
+the variance term dropped from the spread and the `2/k` floor kept.
+
+| Arm (informed market, 200 seeds) | Mean PnL | PnL std | Mean/std | Mean &#124;inv&#124;, T | Aggressor units | Markout | Paired diff vs heuristic, 95% CI |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| InventorySkewMM, skew_k 0.2 | 10,928 | 578 | 18.9 | 3.6 | 20.1 | +1.18 | |
+| A-S as published | 9,887 | 691 | 14.3 | 21.3 | 178.1 | +1.11 | -1,041 (-1,160, -927) |
+| A-S, half-spread pinned at 2.0 | 9,963 | 690 | 14.4 | 16.7 | 191.0 | +1.10 | -965 (-1,079, -856) |
+| A-S, variance term dropped from spread | 9,523 | 624 | 15.3 | 21.2 | 241.8 | +1.02 | -1,405 (-1,514, -1,295) |
+
+The spread term is not inert, but it is not the cause either. Giving A-S
+NaiveMM's spread recovers 76 of a 1,041-tick gap and changes the std by
+one tick; the remaining 965 (CI excludes zero by a wide margin) is the
+skew schedule, 0.63 ticks per unit at the open decaying to nothing, and
+the aggressor fills it produces. Tightening the spread to the floor makes
+A-S worse, not better: 242 aggressor units a session against 178, and
+another 360 of mean PnL gone, because a tighter quote sits closer to a
+reservation price that is already through the mid. Spread and skew
+interact through crossing; the comparison in the table above is a
+comparison of skew schedules with the spread held as close to equal as
+tick snapping allows, and the heuristic wins it.
 
 A-S's mean |terminal inventory| of 21.1 against the heuristic's 3.6 is the
 observation the next result explains.
@@ -601,6 +653,17 @@ the wrong sigma as well as at a different share.
   is the windfall that offsets the informed trader's toll in Result 4b. In
   a market whose noise did not know the fundamental, 12% informed volume at
   -1.4 ticks per unit would show up in mean PnL.
+- **The noise pays everyone, and pays a lot.** Per informed session with
+  the tuned heuristic as subject (200 seeds, from
+  `results/spread_decomposition_informed.json`), the market maker earns
+  about 10,900 ticks, the informed trader about 8,200, and the twenty
+  noise agents lose about 19,200 between them: roughly 0.6 ticks on every
+  one of the 30,000 units that change hands. A market maker whose
+  per-session mean is nineteen times its standard deviation is being
+  subsidised, not compensated for risk. That is what a zero-intelligence
+  population with a uniform 10-tick offset does, and it is why the
+  absolute PnL levels here say nothing about a real market; only the
+  ordering of strategies and the mechanisms behind it carry over.
 - **Adverse selection is concentrated, not modest.** The informed trader
   takes 12% of the market maker's passive volume and each of those units
   loses about 1.4 ticks at a 50-tick horizon: the whole half-spread and
@@ -656,6 +719,27 @@ identically from the same seed produce byte-identical Parquet exports, which
 `tests/test_logging.py::TestExport::test_same_seed_exports_byte_identical_parquet`
 checks directly. The fundamental's path is generated lazily and cached, so it
 is the same whichever agent asks for it first and however far ahead.
+
+Which seeds each result uses:
+
+| Result | Seeds | Disjoint from |
+|---|---|---|
+| Calibration constants (2) | 999,999 | everything else |
+| Calibration sigma stability (2) | 1000..1009 | everything else |
+| gamma and skew_k sweeps (3) | 10,000..10,059 | every seed a result is read on |
+| Monte Carlo (4) | 0..499 | the sweep and calibration |
+| Inventory path (5) | 0..59 | the sweep and calibration; a subset of the Monte Carlo's |
+| Spread decomposition (4b) | 20,000..20,199 | everything else |
+| Market impact (7) | 0..119 | the sweep and calibration; a subset of the Monte Carlo's |
+
+The one property that matters is that nothing is chosen on seeds it is
+later scored on; Results 5 and 7 re-use Monte Carlo seeds because nothing
+is chosen there. Two gaps: `results/monte_carlo_summary_*.json` records
+per-strategy summaries but not the 500 per-trial rows, so the paired
+differences the matched seeds make possible cannot be recomputed from the
+committed results (the decomposition JSON does write its per-seed rows);
+and the inventory-path and market-impact scripts do not record their seed
+ranges in their JSON, only in the script source.
 
 ## References
 

@@ -177,6 +177,16 @@ def run_trial(
     """One strategy instance against a fresh ``spec`` market, for one seed."""
     mm = mm_factory()
     session = run_session(mm, spec=spec, seed=seed, n_ticks=n_ticks)
+    return trial_from_session(mm, session, seed=seed)
+
+
+def trial_from_session(mm: QuotingAgent, session: Session, *, seed: int) -> TrialResult:
+    """The per-trial accounting for a finished ``session`` run with ``mm`` as subject.
+
+    Split out of ``run_trial`` so research code that also needs the engine
+    (for other agents' PnL, say) can run the session itself and still report
+    the same fields.
+    """
     engine = session.engine
     mark_for_pnl = session.mark_for_pnl
 
