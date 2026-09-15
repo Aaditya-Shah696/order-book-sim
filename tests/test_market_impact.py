@@ -6,13 +6,21 @@ uses. These test the machinery, not the effect size.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
 from lob_simulator.agents.quoting import AvellanedaStoikovMM, InventorySkewMM
+from lob_simulator.market import UNINFORMED, MarketSpec
 from lob_simulator.research.market_impact import analyze_market_impact, run_impact_trial
 
 N_TICKS = 400
-K_HAT, SIGMA_HAT, GAMMA = 0.4986, 0.03554, 0.2
+K_HAT, SIGMA_HAT, GAMMA = 0.48, 3.56, 1e-5
+"""Price-unit sigma (ticks per sqrt(tick)); see tests/test_avellaneda_stoikov.py."""
+
+
+def _spec(n_noise: int) -> MarketSpec:
+    return replace(UNINFORMED, n_noise=n_noise)
 
 
 def _skew_factory() -> InventorySkewMM:
@@ -36,18 +44,18 @@ def _as_factory() -> AvellanedaStoikovMM:
 
 class TestRunImpactTrial:
     def test_mm_share_is_a_fraction_between_zero_and_one(self) -> None:
-        trial = run_impact_trial(_skew_factory, n_noise=10, seed=1, n_ticks=N_TICKS)
+        trial = run_impact_trial(_skew_factory, spec=_spec(10), seed=1, n_ticks=N_TICKS)
         assert 0.0 <= trial.mm_share <= 1.0
 
     def test_mm_share_is_higher_with_fewer_noise_agents(self) -> None:
         """The mechanism the sweep uses to vary the MM's share of order flow."""
-        low_noise = run_impact_trial(_skew_factory, n_noise=3, seed=1, n_ticks=N_TICKS)
-        high_noise = run_impact_trial(_skew_factory, n_noise=30, seed=1, n_ticks=N_TICKS)
+        low_noise = run_impact_trial(_skew_factory, spec=_spec(3), seed=1, n_ticks=N_TICKS)
+        high_noise = run_impact_trial(_skew_factory, spec=_spec(30), seed=1, n_ticks=N_TICKS)
         assert low_noise.mm_share > high_noise.mm_share
 
     def test_reproducible_given_the_same_seed(self) -> None:
-        a = run_impact_trial(_skew_factory, n_noise=8, seed=5, n_ticks=N_TICKS)
-        b = run_impact_trial(_skew_factory, n_noise=8, seed=5, n_ticks=N_TICKS)
+        a = run_impact_trial(_skew_factory, spec=_spec(8), seed=5, n_ticks=N_TICKS)
+        b = run_impact_trial(_skew_factory, spec=_spec(8), seed=5, n_ticks=N_TICKS)
         assert a == b
 
 
@@ -56,6 +64,7 @@ class TestAnalyzeMarketImpact:
         finding = analyze_market_impact(
             skew_factory=_skew_factory,
             as_factory=_as_factory,
+            spec=UNINFORMED,
             n_noise_values=[3, 8, 20],
             seeds=range(15),
             n_ticks=N_TICKS,
@@ -77,6 +86,7 @@ class TestAnalyzeMarketImpact:
         finding = analyze_market_impact(
             skew_factory=_skew_factory,
             as_factory=_as_factory,
+            spec=UNINFORMED,
             n_noise_values=[3, 8, 20, 40],
             seeds=range(10),
             n_ticks=N_TICKS,
@@ -92,6 +102,7 @@ class TestAnalyzeMarketImpact:
         finding = analyze_market_impact(
             skew_factory=_skew_factory,
             as_factory=_as_factory,
+            spec=UNINFORMED,
             n_noise_values=[3, 10, 25],
             seeds=range(20),
             n_ticks=N_TICKS,

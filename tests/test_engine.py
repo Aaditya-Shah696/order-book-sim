@@ -10,7 +10,7 @@ import pytest
 from helpers import RandomTraderAgent, ScriptedAgent
 from lob_simulator.agent import Agent, OrderView, Snapshot
 from lob_simulator.engine import Engine
-from lob_simulator.types import OrderIntent, Place, Side
+from lob_simulator.types import Cancel, OrderIntent, Place, Side
 
 
 class TestAgentPnl:
@@ -193,6 +193,31 @@ class TestSettlementAndConservation:
         total_cash = sum(a.cash for a in agents)
         assert total_inventory == n_agents * initial_inventory_each
         assert total_cash == sum(a.initial_cash for a in agents)
+
+
+class TestIntentCount:
+    def test_counts_every_place_and_cancel_applied(self) -> None:
+        agent = ScriptedAgent(
+            agent_id=1,
+            cash=10_000,
+            inventory=0,
+            script=[
+                [
+                    Place(agent_id=1, side=Side.BUY, price=99, qty=1),
+                    Place(agent_id=1, side=Side.SELL, price=101, qty=1),
+                ],
+                [Cancel(agent_id=1, order_id=1)],
+                [],
+            ],
+        )
+        engine = Engine([agent], reference_price=100.0)
+        assert engine.intent_count == 0
+        engine.step()
+        assert engine.intent_count == 2
+        engine.step()
+        assert engine.intent_count == 3
+        engine.step()
+        assert engine.intent_count == 3
 
 
 class TestFixedAgentOrder:

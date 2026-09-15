@@ -1,0 +1,102 @@
+{
+  "market": "uninformed",
+  "n_trials": 500,
+  "n_ticks": 2000,
+  "n_noise": 20,
+  "reference_price": 100,
+  "calibration": {
+    "sigma": 3.5562968418965393,
+    "sigma_diffusive": 0.7029658431963395,
+    "sigma_horizon": 50,
+    "sigma_fed_to_as": "sigma_diffusive",
+    "sigma_log": 0.03551436808263543,
+    "A": 5.493207017572031,
+    "k": 0.4649952757187631,
+    "r_squared": 0.9875196420340026,
+    "gamma": 5e-05,
+    "skew_k": 0.15
+  },
+  "strategies": {
+    "NaiveMM": {
+      "strategy_name": "NaiveMM",
+      "n_trials": 500,
+      "mean_pnl": 11353.421,
+      "var_pnl": 540152.1074739479,
+      "std_pnl": 734.9504115747864,
+      "mean_over_std_pnl": 15.447873517987288,
+      "skew_pnl": -0.05262053993079751,
+      "p5_pnl": 10201.825,
+      "p95_pnl": 12567.949999999999,
+      "mean_pnl_ci95": [
+        11290.231225,
+        11419.941075
+      ],
+      "two_sided_tick_fraction": 1.0,
+      "mean_abs_terminal_inventory": 129.698,
+      "std_terminal_inventory": 164.66652856990254,
+      "mean_fill_count": 3880.626,
+      "mean_passive_units": 9008.958,
+      "mean_aggressor_units": 0.34,
+      "mean_realized_pnl": 10671.026,
+      "mean_unrealized_pnl": 682.395,
+      "mean_markout_50": 1.25944561447741,
+      "informed_unit_share": null,
+      "markout_50_vs_informed": null,
+      "markout_50_vs_noise": null
+    },
+    "InventorySkewMM": {
+      "strategy_name": "InventorySkewMM",
+      "n_trials": 500,
+      "mean_pnl": 9633.153,
+      "var_pnl": 240200.1523957916,
+      "std_pnl": 490.1021856672255,
+      "mean_over_std_pnl": 19.655396939079996,
+      "skew_pnl": -0.19999289074115748,
+      "p5_pnl": 8835.95,
+      "p95_pnl": 10359.275,
+      "mean_pnl_ci95": [
+        9590.346650000001,
+        9671.505275000001
+      ],
+      "two_sided_tick_fraction": 1.0,
+      "mean_abs_terminal_inventory": 3.866,
+      "std_terminal_inventory": 4.8907302609088905,
+      "mean_fill_count": 3593.35,
+      "mean_passive_units": 8342.14,
+      "mean_aggressor_units": 1.606,
+      "mean_realized_pnl": 9614.906,
+      "mean_unrealized_pnl": 18.247,
+      "mean_markout_50": 1.1531181767857137,
+      "informed_unit_share": null,
+      "markout_50_vs_informed": null,
+      "markout_50_vs_noise": null
+    },
+    "AvellanedaStoikovMM": {
+      "strategy_name": "AvellanedaStoikovMM",
+      "n_trials": 500,
+      "mean_pnl": 11088.116,
+      "var_pnl": 328716.1678797595,
+      "std_pnl": 573.3377432890317,
+      "mean_over_std_pnl": 19.339588453380866,
+      "skew_pnl": 0.019836782202006725,
+      "p5_pnl": 10130.7,
+      "p95_pnl": 12054.449999999999,
+      "mean_pnl_ci95": [
+        11039.3997,
+        11139.256374999999
+      ],
+      "two_sided_tick_fraction": 1.0,
+      "mean_abs_terminal_inventory": 39.498,
+      "std_terminal_inventory": 49.334386216174344,
+      "mean_fill_count": 3411.94,
+      "mean_passive_units": 7850.558,
+      "mean_aggressor_units": 0.208,
+      "mean_realized_pnl": 11002.662,
+      "mean_unrealized_pnl": 85.454,
+      "mean_markout_50": 1.4059429742338576,
+      "informed_unit_share": null,
+      "markout_50_vs_informed": null,
+      "markout_50_vs_noise": null
+    }
+  }
+}

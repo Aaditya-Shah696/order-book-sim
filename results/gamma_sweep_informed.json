@@ -1,0 +1,272 @@
+{
+  "market": "informed",
+  "sigma": 2.118009583527362,
+  "k": 0.5466003116899777,
+  "n_seeds": 60,
+  "n_ticks": 2000,
+  "selection_rule": "max mean(terminal PnL) / std(terminal PnL)",
+  "chosen_gamma": 7e-05,
+  "chosen_skew_k": 0.2,
+  "points": [
+    {
+      "label": "AvellanedaStoikovMM(gamma=1e-07)",
+      "gamma": 1e-07,
+      "skew_k": null,
+      "mean_pnl": 10538.633333333333,
+      "std_pnl": 13730.998402373685,
+      "mean_over_std_pnl": 0.7675067045023845,
+      "mean_abs_inventory_midsession": 109.26838333333333,
+      "mean_abs_inventory_terminal": 134.21666666666667,
+      "mean_markout": 1.1945467002276744,
+      "skew_per_unit_open": 0.0008971929191827497
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=3e-07)",
+      "gamma": 3e-07,
+      "skew_k": null,
+      "mean_pnl": 12610.9,
+      "std_pnl": 8019.845971406481,
+      "mean_over_std_pnl": 1.572461621452857,
+      "mean_abs_inventory_midsession": 68.55485,
+      "mean_abs_inventory_terminal": 90.31666666666666,
+      "mean_markout": 1.1602414126623388,
+      "skew_per_unit_open": 0.002691578757548249
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=1e-06)",
+      "gamma": 1e-06,
+      "skew_k": null,
+      "mean_pnl": 11051.383333333333,
+      "std_pnl": 4541.763786376713,
+      "mean_over_std_pnl": 2.433280076450168,
+      "mean_abs_inventory_midsession": 30.53645,
+      "mean_abs_inventory_terminal": 85.68333333333334,
+      "mean_markout": 1.155646433112433,
+      "skew_per_unit_open": 0.008971929191827497
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=3e-06)",
+      "gamma": 3e-06,
+      "skew_k": null,
+      "mean_pnl": 11440.733333333334,
+      "std_pnl": 2425.630626488335,
+      "mean_over_std_pnl": 4.71660161625534,
+      "mean_abs_inventory_midsession": 15.933283333333334,
+      "mean_abs_inventory_terminal": 59.6,
+      "mean_markout": 1.1931120071236796,
+      "skew_per_unit_open": 0.026915787575482495
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=1e-05)",
+      "gamma": 1e-05,
+      "skew_k": null,
+      "mean_pnl": 11248.416666666666,
+      "std_pnl": 1281.203532986798,
+      "mean_over_std_pnl": 8.779570440649552,
+      "mean_abs_inventory_midsession": 7.91895,
+      "mean_abs_inventory_terminal": 29.433333333333334,
+      "mean_markout": 1.1978760603874041,
+      "skew_per_unit_open": 0.08971929191827498
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=2e-05)",
+      "gamma": 2e-05,
+      "skew_k": null,
+      "mean_pnl": 11256.833333333334,
+      "std_pnl": 934.6721561852704,
+      "mean_over_std_pnl": 12.04361685414539,
+      "mean_abs_inventory_midsession": 5.714083333333333,
+      "mean_abs_inventory_terminal": 33.43333333333333,
+      "mean_markout": 1.18609930002688,
+      "skew_per_unit_open": 0.17943858383654995
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=3e-05)",
+      "gamma": 3e-05,
+      "skew_k": null,
+      "mean_pnl": 11094.608333333334,
+      "std_pnl": 926.0422487875744,
+      "mean_over_std_pnl": 11.980671883878955,
+      "mean_abs_inventory_midsession": 4.664016666666667,
+      "mean_abs_inventory_terminal": 26.9,
+      "mean_markout": 1.1813663947715405,
+      "skew_per_unit_open": 0.2691578757548249
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=5e-05)",
+      "gamma": 5e-05,
+      "skew_k": null,
+      "mean_pnl": 10517.291666666666,
+      "std_pnl": 838.5495512665776,
+      "mean_over_std_pnl": 12.542242316844536,
+      "mean_abs_inventory_midsession": 3.7127166666666667,
+      "mean_abs_inventory_terminal": 23.45,
+      "mean_markout": 1.141864200098626,
+      "skew_per_unit_open": 0.4485964595913749
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=7e-05)",
+      "gamma": 7e-05,
+      "skew_k": null,
+      "mean_pnl": 10026.5,
+      "std_pnl": 637.2381150356885,
+      "mean_over_std_pnl": 15.734306789603234,
+      "mean_abs_inventory_midsession": 3.2266833333333333,
+      "mean_abs_inventory_terminal": 18.766666666666666,
+      "mean_markout": 1.1140912363560933,
+      "skew_per_unit_open": 0.6280350434279247
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=0.0001)",
+      "gamma": 0.0001,
+      "skew_k": null,
+      "mean_pnl": 8985.266666666666,
+      "std_pnl": 709.1016844360591,
+      "mean_over_std_pnl": 12.671337360892819,
+      "mean_abs_inventory_midsession": 2.8418666666666668,
+      "mean_abs_inventory_terminal": 15.8,
+      "mean_markout": 1.049772613798792,
+      "skew_per_unit_open": 0.8971929191827498
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=0.00015)",
+      "gamma": 0.00015,
+      "skew_k": null,
+      "mean_pnl": 6795.825,
+      "std_pnl": 556.1702948036993,
+      "mean_over_std_pnl": 12.218964341485714,
+      "mean_abs_inventory_midsession": 2.5128833333333334,
+      "mean_abs_inventory_terminal": 16.8,
+      "mean_markout": 0.8997025544788589,
+      "skew_per_unit_open": 1.3457893787741244
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=0.0002)",
+      "gamma": 0.0002,
+      "skew_k": null,
+      "mean_pnl": 4665.533333333334,
+      "std_pnl": 611.9289372907489,
+      "mean_over_std_pnl": 7.624305779670255,
+      "mean_abs_inventory_midsession": 2.3693,
+      "mean_abs_inventory_terminal": 12.0,
+      "mean_markout": 0.7680540178075322,
+      "skew_per_unit_open": 1.7943858383654996
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=0.0003)",
+      "gamma": 0.0003,
+      "skew_k": null,
+      "mean_pnl": 287.60833333333335,
+      "std_pnl": 703.4735794953657,
+      "mean_over_std_pnl": 0.40884027732732786,
+      "mean_abs_inventory_midsession": 2.2671666666666668,
+      "mean_abs_inventory_terminal": 10.6,
+      "mean_markout": 0.45030501168942055,
+      "skew_per_unit_open": 2.691578757548249
+    },
+    {
+      "label": "AvellanedaStoikovMM(gamma=0.001)",
+      "gamma": 0.001,
+      "skew_k": null,
+      "mean_pnl": -19671.466666666667,
+      "std_pnl": 806.6604512530779,
+      "mean_over_std_pnl": -24.38630360036708,
+      "mean_abs_inventory_midsession": 2.415216666666667,
+      "mean_abs_inventory_terminal": 9.283333333333333,
+      "mean_markout": -0.6596557803473778,
+      "skew_per_unit_open": 8.971929191827497
+    }
+  ],
+  "skew_points": [
+    {
+      "label": "InventorySkewMM(skew_k=0.02)",
+      "gamma": null,
+      "skew_k": 0.02,
+      "mean_pnl": 11623.75,
+      "std_pnl": 1593.8900991928786,
+      "mean_over_std_pnl": 7.292692266478152,
+      "mean_abs_inventory_midsession": 12.476166666666666,
+      "mean_abs_inventory_terminal": 13.25,
+      "mean_markout": 1.2835210239537334
+    },
+    {
+      "label": "InventorySkewMM(skew_k=0.05)",
+      "gamma": null,
+      "skew_k": 0.05,
+      "mean_pnl": 11666.041666666666,
+      "std_pnl": 1026.5771590526942,
+      "mean_over_std_pnl": 11.364018343669233,
+      "mean_abs_inventory_midsession": 7.412883333333333,
+      "mean_abs_inventory_terminal": 6.566666666666666,
+      "mean_markout": 1.2697478809347518
+    },
+    {
+      "label": "InventorySkewMM(skew_k=0.1)",
+      "gamma": null,
+      "skew_k": 0.1,
+      "mean_pnl": 11411.666666666666,
+      "std_pnl": 574.233355290063,
+      "mean_over_std_pnl": 19.87287321702565,
+      "mean_abs_inventory_midsession": 5.267816666666667,
+      "mean_abs_inventory_terminal": 4.883333333333334,
+      "mean_markout": 1.2436369759134136
+    },
+    {
+      "label": "InventorySkewMM(skew_k=0.15)",
+      "gamma": null,
+      "skew_k": 0.15,
+      "mean_pnl": 11230.616666666667,
+      "std_pnl": 712.1784220279775,
+      "mean_over_std_pnl": 15.76938632131918,
+      "mean_abs_inventory_midsession": 4.322266666666667,
+      "mean_abs_inventory_terminal": 4.366666666666666,
+      "mean_markout": 1.2362510398804973
+    },
+    {
+      "label": "InventorySkewMM(skew_k=0.2)",
+      "gamma": null,
+      "skew_k": 0.2,
+      "mean_pnl": 10906.558333333332,
+      "std_pnl": 523.4204089502526,
+      "mean_over_std_pnl": 20.837090313705982,
+      "mean_abs_inventory_midsession": 3.76185,
+      "mean_abs_inventory_terminal": 4.166666666666667,
+      "mean_markout": 1.1819901066543113
+    },
+    {
+      "label": "InventorySkewMM(skew_k=0.3)",
+      "gamma": null,
+      "skew_k": 0.3,
+      "mean_pnl": 10185.9,
+      "std_pnl": 530.693931708798,
+      "mean_over_std_pnl": 19.19354903343647,
+      "mean_abs_inventory_midsession": 3.187666666666667,
+      "mean_abs_inventory_terminal": 3.5,
+      "mean_markout": 1.1046130740949625
+    },
+    {
+      "label": "InventorySkewMM(skew_k=0.5)",
+      "gamma": null,
+      "skew_k": 0.5,
+      "mean_pnl": 7760.666666666667,
+      "std_pnl": 467.1792261846957,
+      "mean_over_std_pnl": 16.611754615130398,
+      "mean_abs_inventory_midsession": 2.6624833333333333,
+      "mean_abs_inventory_terminal": 2.783333333333333,
+      "mean_markout": 0.8600969983078138
+    }
+  ],
+  "baselines": [
+    {
+      "label": "NaiveMM",
+      "gamma": null,
+      "skew_k": null,
+      "mean_pnl": 10340.05,
+      "std_pnl": 14643.558148898426,
+      "mean_over_std_pnl": 0.706115951796718,
+      "mean_abs_inventory_midsession": 113.70531666666666,
+      "mean_abs_inventory_terminal": 144.21666666666667,
+      "mean_markout": 1.1984954389248277
+    }
+  ]
+}

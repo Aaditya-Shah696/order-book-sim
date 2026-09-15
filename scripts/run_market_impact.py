@@ -1,6 +1,9 @@
 """Correlate the MM's share of order flow with A-S's PnL variance relative to inventory-skew.
 
 Takes about 40 minutes: 15 noise levels x 2 strategies x 120 seeds x 2000 ticks.
+Runs on the informed market; sigma (diffusive) and k are calibrated at the
+spec's default n_noise and held fixed across the sweep, and gamma and skew_k
+come from results/gamma_sweep_informed.json.
 
 Usage: uv run python scripts/run_market_impact.py
 """
@@ -16,42 +19,57 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from lob_simulator.agents.quoting import AvellanedaStoikovMM, InventorySkewMM
-from lob_simulator.calibration import SESSION_HORIZON_T
+from lob_simulator.calibration import SESSION_HORIZON_T, calibrate
+from lob_simulator.market import INFORMED, SUBJECT_AGENT_ID
+from lob_simulator.research.gamma_sweep import load_chosen_gamma, load_chosen_skew_k
 from lob_simulator.research.market_impact import analyze_market_impact
 
 matplotlib.use("Agg")
 
-REFERENCE_PRICE = 100
+SPEC = INFORMED
 N_NOISE_VALUES = [2, 3, 4, 5, 6, 8, 10, 13, 17, 22, 28, 35, 45, 60, 80]
 N_SEEDS = 120
 N_BOOTSTRAP = 3000
-GAMMA = 0.2
-K_HAT = 0.4986
-SIGMA_HAT = 0.03554
+CALIBRATION_SEED = 999_999
 
 OUT_DIR = Path(__file__).parent.parent / "results"
 
 
 def main() -> None:
+    sweep_json = OUT_DIR / f"gamma_sweep_{SPEC.name}.json"
+    gamma = load_chosen_gamma(sweep_json)
+    skew_k = load_chosen_skew_k(sweep_json)
+    cal = calibrate(SPEC, seed=CALIBRATION_SEED)
+    print(
+        f"[{SPEC.name}] sigma_diffusive={cal.sigma_diffusive:.4f} (one-tick {cal.sigma:.4f}) "
+        f"k={cal.k:.4f} gamma={gamma:g} skew_k={skew_k:g} "
+        f"(calibrated at n_noise={SPEC.n_noise}, held fixed across the sweep)"
+    )
+
     t0 = time.perf_counter()
     finding = analyze_market_impact(
         skew_factory=lambda: InventorySkewMM(
-            agent_id=0, cash=1_000_000, inventory=0, quote_qty=5, half_spread_ticks=2.0, skew_k=0.05
-        ),
-        as_factory=lambda: AvellanedaStoikovMM(
-            agent_id=0,
+            agent_id=SUBJECT_AGENT_ID,
             cash=1_000_000,
             inventory=0,
             quote_qty=5,
-            gamma=GAMMA,
-            sigma=SIGMA_HAT,
-            k=K_HAT,
+            half_spread_ticks=2.0,
+            skew_k=skew_k,
+        ),
+        as_factory=lambda: AvellanedaStoikovMM(
+            agent_id=SUBJECT_AGENT_ID,
+            cash=1_000_000,
+            inventory=0,
+            quote_qty=5,
+            gamma=gamma,
+            sigma=cal.sigma_diffusive,
+            k=cal.k,
             horizon_t=float(SESSION_HORIZON_T),
         ),
+        spec=SPEC,
         n_noise_values=N_NOISE_VALUES,
         seeds=range(N_SEEDS),
         n_ticks=SESSION_HORIZON_T,
-        reference_price=REFERENCE_PRICE,
         n_bootstrap=N_BOOTSTRAP,
     )
     elapsed = time.perf_counter() - t0
@@ -70,7 +88,17 @@ def main() -> None:
     with open(OUT_DIR / "market_impact.json", "w") as f:
         json.dump(
             {
+                "market": SPEC.name,
                 "n_seeds_per_level": N_SEEDS,
+                "calibration": {
+                    "sigma": cal.sigma_diffusive,
+                    "sigma_is": "diffusive (calibration.sigma_diffusive)",
+                    "sigma_one_tick": cal.sigma,
+                    "sigma_horizon": cal.sigma_horizon,
+                    "k": cal.k,
+                    "gamma": gamma,
+                    "skew_k": skew_k,
+                },
                 "n_noise_values": finding.n_noise_values,
                 "mean_mm_share": finding.mean_mm_share,
                 "variance_ratio": finding.variance_ratio,
@@ -103,8 +131,9 @@ def main() -> None:
     ax.set_ylabel("PnL variance ratio (A-S / InventorySkew)")
     title_suffix = "null result" if finding.is_null else "effect confirmed"
     ax.set_title(
-        f"corr={finding.correlation:.2f}, 95% CI=({finding.correlation_ci95[0]:.2f}, "
-        f"{finding.correlation_ci95[1]:.2f}) -- {title_suffix}"
+        f"{SPEC.name} market: corr={finding.correlation:.2f}, "
+        f"95% CI=({finding.correlation_ci95[0]:.2f}, {finding.correlation_ci95[1]:.2f}) "
+        f"-- {title_suffix}"
     )
     ax.legend(fontsize=9)
     fig.tight_layout()

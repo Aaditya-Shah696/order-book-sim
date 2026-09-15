@@ -15,6 +15,12 @@ class QuotingAgent(Agent):
     Subclasses implement only ``quote()``. Cancels are returned ahead of the
     new placements and the engine applies intents in order, so the old pair is
     always gone before the new pair goes in.
+
+    Quotes are snapped outward to the tick grid: the bid is the floor of
+    ``center - half_spread`` and the ask the ceiling of ``center + half_spread``.
+    Rounding to nearest would let a half-integer mark pull one side a tick
+    closer than the other, and Python's round-half-to-even would pick which
+    side by parity.
     """
 
     def __init__(self, *, agent_id: int, cash: int, inventory: int, quote_qty: int) -> None:
@@ -23,13 +29,24 @@ class QuotingAgent(Agent):
         super().__init__(agent_id=agent_id, cash=cash, inventory=inventory)
         self.quote_qty = quote_qty
 
+    @staticmethod
+    def snap(center: float, half_spread: float) -> tuple[int, int]:
+        """``(bid, ask)`` in integer ticks, never tighter than ``half_spread`` either side.
+
+        The bid is floored at 1 tick; the ask is at least one tick above it.
+        """
+        if half_spread <= 0:
+            raise ValueError(f"half_spread must be positive, got {half_spread}")
+        bid = max(1, math.floor(center - half_spread))
+        ask = max(bid + 1, math.ceil(center + half_spread))
+        return bid, ask
+
     def act(self, snapshot: Snapshot) -> list[OrderIntent]:
         intents: list[OrderIntent] = [
             Cancel(agent_id=self.agent_id, order_id=o.id) for o in snapshot.my_orders
         ]
         center, half_spread = self.quote(snapshot)
-        bid_price = round(center - half_spread)
-        ask_price = round(center + half_spread)
+        bid_price, ask_price = self.snap(center, half_spread)
         intents.append(
             Place(agent_id=self.agent_id, side=Side.BUY, price=bid_price, qty=self.quote_qty)
         )
@@ -101,9 +118,17 @@ class AvellanedaStoikovMM(QuotingAgent):
     reservation price:  r     = mid - q * gamma * sigma^2 * (T - t)
     optimal spread:     delta = gamma * sigma^2 * (T - t) + (2/gamma) * ln(1 + gamma/k)
 
-    Quotes at ``center = r``, ``half_spread = delta / 2``. ``gamma``, ``sigma``,
-    ``k`` and ``horizon_t`` are supplied by the caller; this class does no
-    calibration of its own (see ``calibration.py``).
+    Quotes at ``center = r``, ``half_spread = delta / 2``.
+
+    Units: the model's mid is an arithmetic Brownian motion ``dS = sigma dW``
+    in *price* units, so ``sigma`` must be the per-tick standard deviation of
+    mark *differences* in ticks (``calibration.estimate_sigma`` with
+    ``units="price"``), not a log-return volatility. ``k`` is the fill
+    intensity's decay per tick of depth and ``horizon_t`` is in ticks. The
+    inventory skew ``gamma * sigma^2 * (T - t)`` is therefore in ticks per
+    unit of inventory and vanishes at ``T`` by construction. ``gamma``,
+    ``sigma``, ``k`` and ``horizon_t`` are supplied by the caller; this class
+    does no calibration of its own.
     """
 
     def __init__(
@@ -132,9 +157,13 @@ class AvellanedaStoikovMM(QuotingAgent):
         self.k = k
         self.horizon_t = horizon_t
 
+    def skew_per_unit(self, t: int) -> float:
+        """``gamma * sigma^2 * (T - t)``: ticks of reservation shift per unit of inventory."""
+        tau = max(0.0, self.horizon_t - t)
+        return self.gamma * self.sigma**2 * tau
+
     def quote(self, snapshot: Snapshot) -> tuple[float, float]:
-        tau = max(0.0, self.horizon_t - snapshot.t)
-        variance_to_go = self.gamma * self.sigma**2 * tau
+        variance_to_go = self.skew_per_unit(snapshot.t)
         reservation = snapshot.mark - self.inventory * variance_to_go
         spread = variance_to_go + (2.0 / self.gamma) * math.log(1.0 + self.gamma / self.k)
         return reservation, spread / 2.0

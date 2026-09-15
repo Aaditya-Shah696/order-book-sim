@@ -6,11 +6,12 @@ import random
 
 import pytest
 
-from lob_simulator.agents.quoting import NaiveMM
+from lob_simulator.agent import Snapshot
+from lob_simulator.agents.quoting import NaiveMM, QuotingAgent
 from lob_simulator.agents.zero_intelligence import ZeroIntelligenceAgent
 from lob_simulator.engine import Engine
 from lob_simulator.seeding import spawn_rngs
-from lob_simulator.types import Side
+from lob_simulator.types import Place, Side
 
 
 def _make_naive_mm(
@@ -104,3 +105,44 @@ class TestNaiveMMInventoryDrift:
             f"NaiveMM inventory only ranged over {traveled_range} "
             f"(vs. quote_qty={mm.quote_qty}) -- doesn't look like unbounded drift"
         )
+
+
+class TestQuoteSnapping:
+    """Quotes snap outward to the tick grid: floor the bid, ceil the ask."""
+
+    def test_half_integer_mark_keeps_both_sides_at_least_half_spread_away(self) -> None:
+        bid, ask = QuotingAgent.snap(100.5, 2.0)
+        assert (bid, ask) == (98, 103)
+        assert 100.5 - bid >= 2.0 and ask - 100.5 >= 2.0
+
+    def test_integer_mark_and_integer_half_spread_are_exact(self) -> None:
+        assert QuotingAgent.snap(100.0, 2.0) == (98, 102)
+
+    def test_fractional_half_spread_never_rounds_inward(self) -> None:
+        for center in (100.0, 100.5, 99.25):
+            for half in (1.66, 1.91, 2.4):
+                bid, ask = QuotingAgent.snap(center, half)
+                assert center - bid >= half
+                assert ask - center >= half
+
+    def test_no_parity_asymmetry_at_exact_halves(self) -> None:
+        """round() would have made these (98, 102) and (100, 102): 2.5 one side, 1.5 the other."""
+        assert QuotingAgent.snap(100.5, 2.0) == (98, 103)
+        assert QuotingAgent.snap(99.5, 2.0) == (97, 102)
+
+    def test_bid_floors_at_one_tick_and_ask_stays_above_it(self) -> None:
+        bid, ask = QuotingAgent.snap(1.5, 3.0)
+        assert bid == 1
+        assert ask == 5
+
+    def test_rejects_nonpositive_half_spread(self) -> None:
+        with pytest.raises(ValueError):
+            QuotingAgent.snap(100.0, 0.0)
+
+    def test_naive_mm_quotes_on_a_half_integer_mark_are_symmetric(self) -> None:
+        mm = _make_naive_mm(half_spread_ticks=2.0)
+        snapshot = Snapshot(t=0, best_bid=100, best_ask=101, mark=100.5, my_orders=())
+        places = [i for i in mm.act(snapshot) if isinstance(i, Place)]
+        bid = next(p for p in places if p.side is Side.BUY)
+        ask = next(p for p in places if p.side is Side.SELL)
+        assert (bid.price, ask.price) == (98, 103)

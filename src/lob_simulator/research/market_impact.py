@@ -8,14 +8,12 @@ and A-S's PnL variance relative to InventorySkewMM's is correlated against it.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
 from ..agents.quoting import QuotingAgent
-from ..agents.zero_intelligence import ZeroIntelligenceAgent
-from ..engine import Engine
-from ..seeding import spawn_rngs
+from ..market import MarketSpec, build_market
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -32,29 +30,17 @@ class ImpactTrial:
 def run_impact_trial(
     mm_factory: Callable[[], QuotingAgent],
     *,
-    n_noise: int,
+    spec: MarketSpec,
     seed: int,
     n_ticks: int,
-    reference_price: int = 100,
 ) -> ImpactTrial:
-    """One subject MM against ``n_noise`` ZI agents, for one seed.
+    """One subject MM in ``spec``, for one seed.
 
     Terminal PnL uses the same last-two-sided-tick rule as
     ``monte_carlo.run_trial``; this variant also records ``mm_share``.
     """
-    rngs = spawn_rngs(seed, n_noise)
-    noise = [
-        ZeroIntelligenceAgent(
-            agent_id=i + 1,
-            cash=1_000_000,
-            inventory=1000,
-            reference_price=reference_price,
-            rng=rngs[i],
-        )
-        for i in range(n_noise)
-    ]
     mm = mm_factory()
-    engine = Engine([mm, *noise], reference_price=float(reference_price))
+    engine = build_market(spec, seed=seed, subject=mm).engine
 
     last_two_sided_mark: float | None = None
     for _ in range(n_ticks):
@@ -72,7 +58,7 @@ def run_impact_trial(
     mm_share = mm_trades / total_trades if total_trades > 0 else float("nan")
 
     return ImpactTrial(
-        n_noise=n_noise, seed=seed, mm_share=mm_share, terminal_pnl=mm.pnl(mark_for_pnl)
+        n_noise=spec.n_noise, seed=seed, mm_share=mm_share, terminal_pnl=mm.pnl(mark_for_pnl)
     )
 
 
@@ -112,35 +98,27 @@ def analyze_market_impact(
     *,
     skew_factory: Callable[[], QuotingAgent],
     as_factory: Callable[[], QuotingAgent],
+    spec: MarketSpec,
     n_noise_values: Sequence[int],
     seeds: Sequence[int],
     n_ticks: int,
-    reference_price: int = 100,
     n_bootstrap: int = 2000,
     bootstrap_seed: int = 0,
 ) -> MarketImpactFinding:
     """Sweep the MM's share of order flow and correlate it with the PnL-variance ratio.
 
-    Each bootstrap replicate draws one set of seed indices and applies it at
-    every ``n_noise`` level, so the CI accounts for seed sampling across the
-    whole sweep rather than per point.
+    ``spec`` supplies everything but ``n_noise``, which takes each value in
+    ``n_noise_values`` in turn. Each bootstrap replicate draws one set of seed
+    indices and applies it at every level, so the CI accounts for seed
+    sampling across the whole sweep rather than per point.
     """
+    specs = {n: replace(spec, n_noise=n) for n in n_noise_values}
     skew_by_level = {
-        n: [
-            run_impact_trial(
-                skew_factory, n_noise=n, seed=s, n_ticks=n_ticks, reference_price=reference_price
-            )
-            for s in seeds
-        ]
+        n: [run_impact_trial(skew_factory, spec=specs[n], seed=s, n_ticks=n_ticks) for s in seeds]
         for n in n_noise_values
     }
     as_by_level = {
-        n: [
-            run_impact_trial(
-                as_factory, n_noise=n, seed=s, n_ticks=n_ticks, reference_price=reference_price
-            )
-            for s in seeds
-        ]
+        n: [run_impact_trial(as_factory, spec=specs[n], seed=s, n_ticks=n_ticks) for s in seeds]
         for n in n_noise_values
     }
 

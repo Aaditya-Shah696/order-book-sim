@@ -1,7 +1,11 @@
 """AvellanedaStoikovMM tests.
 
-K_HAT and SIGMA_HAT come from scripts/run_calibration.py, averaged over
-several seeds. GAMMA was chosen by sweeping against those constants.
+The *_HAT constants are what ``calibration.calibrate`` measures on each
+market on seed 999,999 (scripts/run_calibration.py, results/calibration.json).
+SIGMA_HAT is the one-tick figure, mostly bid-ask bounce and kept for
+reporting; SIGMA_DIFFUSIVE_HAT is the 50-tick figure A-S is actually fed,
+in ticks per sqrt(tick). GAMMA is the value scripts/run_gamma_sweep.py chose
+for each market by its stated rule with that sigma.
 """
 
 from __future__ import annotations
@@ -12,115 +16,172 @@ import pytest
 
 from lob_simulator.agent import Snapshot
 from lob_simulator.agents.quoting import AvellanedaStoikovMM, NaiveMM
-from lob_simulator.agents.zero_intelligence import ZeroIntelligenceAgent
-from lob_simulator.calibration import SESSION_HORIZON_T, estimate_sigma, fit_fill_intensity
-from lob_simulator.engine import Engine
-from lob_simulator.seeding import spawn_rngs
+from lob_simulator.calibration import SESSION_HORIZON_T, calibrate, estimate_sigma
+from lob_simulator.market import INFORMED, SUBJECT_AGENT_ID, UNINFORMED, MarketSpec, build_market
+from lob_simulator.research.inventory_path import run_inventory_paths
 
-REFERENCE_PRICE = 100
-N_NOISE = 20
 T = SESSION_HORIZON_T
 
-GAMMA = 0.2
-K_HAT = 0.4986
-SIGMA_HAT = 0.03554
+UNINFORMED_K_HAT, UNINFORMED_SIGMA_HAT, UNINFORMED_SIGMA_DIFFUSIVE_HAT = 0.465, 3.556, 0.703
+UNINFORMED_GAMMA = 5e-5
+INFORMED_K_HAT, INFORMED_SIGMA_HAT, INFORMED_SIGMA_DIFFUSIVE_HAT = 0.547, 3.250, 2.118
+INFORMED_GAMMA = 7e-5
 
 FLAT_SNAPSHOT = Snapshot(t=0, best_bid=None, best_ask=None, mark=100.0, my_orders=())
 
 
-def _make_as_mm(agent_id: int = 0, gamma: float = GAMMA) -> AvellanedaStoikovMM:
+def _make_as_mm(
+    gamma: float = INFORMED_GAMMA,
+    sigma: float = INFORMED_SIGMA_DIFFUSIVE_HAT,
+    k: float = INFORMED_K_HAT,
+) -> AvellanedaStoikovMM:
     return AvellanedaStoikovMM(
-        agent_id=agent_id,
+        agent_id=SUBJECT_AGENT_ID,
         cash=1_000_000,
         inventory=0,
         quote_qty=5,
         gamma=gamma,
-        sigma=SIGMA_HAT,
-        k=K_HAT,
+        sigma=sigma,
+        k=k,
         horizon_t=float(T),
     )
 
 
-def _make_noise_agents(n: int, seed: int) -> list[ZeroIntelligenceAgent]:
-    rngs = spawn_rngs(seed, n)
-    return [
-        ZeroIntelligenceAgent(
-            agent_id=i + 1,
-            cash=1_000_000,
-            inventory=1000,
-            reference_price=REFERENCE_PRICE,
-            rng=rngs[i],
-        )
-        for i in range(n)
-    ]
+def _make_naive() -> NaiveMM:
+    return NaiveMM(
+        agent_id=SUBJECT_AGENT_ID, cash=1_000_000, inventory=0, quote_qty=5, half_spread_ticks=2.0
+    )
 
 
 class TestCalibrationConstantsAreReal:
-    """Re-derive the constants above and confirm they land in the same ballpark."""
+    """Re-derive the constants above on a different seed and land in the same ballpark."""
 
-    def test_recalibrating_reproduces_the_hardcoded_constants(self) -> None:
-        fit = fit_fill_intensity(
-            [1, 2, 3, 4, 5, 6, 8, 10, 12, 15], n_ticks=T, n_noise=N_NOISE, seed=11
-        )
-        assert fit.r_squared > 0.9
-        assert fit.k == pytest.approx(K_HAT, rel=0.3)
+    @pytest.mark.parametrize(
+        ("spec", "k_hat", "sigma_hat", "sigma_diffusive_hat"),
+        [
+            (UNINFORMED, UNINFORMED_K_HAT, UNINFORMED_SIGMA_HAT, UNINFORMED_SIGMA_DIFFUSIVE_HAT),
+            (INFORMED, INFORMED_K_HAT, INFORMED_SIGMA_HAT, INFORMED_SIGMA_DIFFUSIVE_HAT),
+        ],
+        ids=["uninformed", "informed"],
+    )
+    def test_recalibrating_reproduces_the_hardcoded_constants(
+        self, spec: MarketSpec, k_hat: float, sigma_hat: float, sigma_diffusive_hat: float
+    ) -> None:
+        cal = calibrate(spec, seed=11)
+        assert cal.r_squared > 0.9
+        assert cal.k == pytest.approx(k_hat, rel=0.3)
+        assert cal.sigma == pytest.approx(sigma_hat, rel=0.3)
+        assert cal.sigma_diffusive == pytest.approx(sigma_diffusive_hat, rel=0.3)
 
-        engine = Engine(
-            _make_noise_agents(N_NOISE, seed=11), reference_price=float(REFERENCE_PRICE)
-        )
+    @pytest.mark.parametrize("spec", [UNINFORMED, INFORMED], ids=["uninformed", "informed"])
+    def test_sigma_is_in_price_units_not_log_units(self, spec: MarketSpec) -> None:
+        """Price-unit sigma is the log-return sigma times the price level, to
+        first order. Feeding the log figure to A-S would rescale gamma by the
+        square of that level: 10^4 at a price of 100, 10^6 at 1000."""
+        engine = build_market(spec, seed=11).engine
         engine.run(T)
-        sigma = estimate_sigma([m.mark for m in engine.mark_log], window=100)
-        assert sigma == pytest.approx(SIGMA_HAT, rel=0.3)
+        marks = [m.mark for m in engine.mark_log]
+        price_sigma = estimate_sigma(marks, units="price")
+        log_sigma = estimate_sigma(marks, units="log")
+        level = statistics.median(marks)
+        assert level > 50
+        assert price_sigma == pytest.approx(log_sigma * level, rel=0.05)
+
+    def test_diffusive_sigma_is_well_below_the_one_tick_sigma_on_both_markets(self) -> None:
+        """The one-tick figure is mostly bounce: on the uninformed market
+        nothing diffuses at all, on the informed market only the fundamental
+        does, and it moves less than the mark jitters."""
+        assert UNINFORMED_SIGMA_DIFFUSIVE_HAT < 0.25 * UNINFORMED_SIGMA_HAT
+        assert INFORMED_SIGMA_DIFFUSIVE_HAT < 0.7 * INFORMED_SIGMA_HAT
+        assert INFORMED.fundamental is not None
+        assert INFORMED_SIGMA_DIFFUSIVE_HAT == pytest.approx(
+            INFORMED.fundamental.per_tick_std, rel=0.15
+        )
 
 
 class TestReservationPriceConvergesToMid:
     def test_at_t_equals_T_reservation_equals_mid_regardless_of_inventory(self) -> None:
         mm = _make_as_mm()
-        snapshot_at_horizon = Snapshot(t=T, best_bid=None, best_ask=None, mark=105.0, my_orders=())
-        for inv in (-80, -1, 0, 1, 80):
-            mm.inventory = inv
-            center, _ = mm.quote(snapshot_at_horizon)
-            assert center == pytest.approx(105.0)
+        mm.inventory = 500
+        snapshot = Snapshot(t=T, best_bid=None, best_ask=None, mark=100.0, my_orders=())
+        center, _ = mm.quote(snapshot)
+        assert center == pytest.approx(100.0)
+        assert mm.skew_per_unit(T) == 0.0
 
     def test_reservation_moves_monotonically_toward_mid_as_t_increases(self) -> None:
         mm = _make_as_mm()
-        mm.inventory = 40
-        distances = []
-        for t in (0, T // 4, T // 2, (3 * T) // 4, T):
-            snap = Snapshot(t=t, best_bid=None, best_ask=None, mark=100.0, my_orders=())
-            center, _ = mm.quote(snap)
-            distances.append(abs(center - 100.0))
-        assert distances == sorted(distances, reverse=True)
-        assert distances[-1] == pytest.approx(0.0)
+        mm.inventory = 50
+        gaps = []
+        for t in (0, T // 4, T // 2, 3 * T // 4, T):
+            snapshot = Snapshot(t=t, best_bid=None, best_ask=None, mark=100.0, my_orders=())
+            center, _ = mm.quote(snapshot)
+            gaps.append(abs(100.0 - center))
+        assert gaps == sorted(gaps, reverse=True)
+        assert gaps[0] > 0
 
     def test_spread_narrows_as_t_increases(self) -> None:
         mm = _make_as_mm()
         spreads = []
         for t in (0, T // 2, T):
-            snap = Snapshot(t=t, best_bid=None, best_ask=None, mark=100.0, my_orders=())
-            _, half_spread = mm.quote(snap)
-            spreads.append(half_spread)
-        assert spreads == sorted(spreads, reverse=True)
+            snapshot = Snapshot(t=t, best_bid=None, best_ask=None, mark=100.0, my_orders=())
+            _, half = mm.quote(snapshot)
+            spreads.append(half)
+        assert spreads[0] > spreads[1] > spreads[2] > 0
+
+    def test_spread_floor_is_the_gamma_to_zero_limit(self) -> None:
+        """At t = T the spread is (2/gamma) ln(1 + gamma/k), which tends to 2/k."""
+        _, half_at_T = _make_as_mm().quote(
+            Snapshot(t=T, best_bid=None, best_ask=None, mark=100.0, my_orders=())
+        )
+        assert 2 * half_at_T == pytest.approx(2.0 / INFORMED_K_HAT, rel=0.01)
+
+    def test_spread_term_is_inert_after_tick_snapping(self) -> None:
+        """2/k = 3.66 ticks, half 1.83: snapped outward that is the same bid
+        and ask NaiveMM's 2.0 half-spread gives on every mark, so the
+        comparison between the two is a comparison of reservation skews."""
+        mm = _make_as_mm()
+        naive = _make_naive()
+        for mark in (100.0, 100.5, 1000.0, 1000.5):
+            snapshot = Snapshot(t=T, best_bid=None, best_ask=None, mark=mark, my_orders=())
+            assert mm.snap(*mm.quote(snapshot)) == naive.snap(*naive.quote(snapshot))
 
 
 class TestInventorySkew:
     def test_positive_inventory_shifts_reservation_below_mid(self) -> None:
         mm = _make_as_mm()
-        mm.inventory = 50
+        mm.inventory = 10
         center, _ = mm.quote(FLAT_SNAPSHOT)
-        assert center < FLAT_SNAPSHOT.mark
+        assert center < 100.0
 
     def test_negative_inventory_shifts_reservation_above_mid(self) -> None:
         mm = _make_as_mm()
-        mm.inventory = -50
+        mm.inventory = -10
         center, _ = mm.quote(FLAT_SNAPSHOT)
-        assert center > FLAT_SNAPSHOT.mark
+        assert center > 100.0
 
     def test_zero_inventory_reservation_equals_mid(self) -> None:
+        center, _ = _make_as_mm().quote(FLAT_SNAPSHOT)
+        assert center == pytest.approx(100.0)
+
+    def test_skew_per_unit_is_gamma_sigma_squared_tau_in_ticks(self) -> None:
         mm = _make_as_mm()
-        mm.inventory = 0
+        assert mm.skew_per_unit(0) == pytest.approx(
+            INFORMED_GAMMA * INFORMED_SIGMA_DIFFUSIVE_HAT**2 * T
+        )
+        mm.inventory = 7
         center, _ = mm.quote(FLAT_SNAPSHOT)
-        assert center == pytest.approx(FLAT_SNAPSHOT.mark)
+        assert 100.0 - center == pytest.approx(7 * mm.skew_per_unit(0))
+
+    def test_chosen_gamma_gives_a_sub_tick_skew_per_unit_at_the_open(self) -> None:
+        """Past about a tick per unit the agent's own quotes cross the mid
+        after one 5-unit fill and it dumps inventory below fair value; the
+        sweep's chosen gamma sits well inside that on both markets."""
+        informed = _make_as_mm().skew_per_unit(0)
+        uninformed = _make_as_mm(
+            gamma=UNINFORMED_GAMMA, sigma=UNINFORMED_SIGMA_DIFFUSIVE_HAT, k=UNINFORMED_K_HAT
+        ).skew_per_unit(0)
+        assert 0.3 < informed < 1.0
+        assert 0.0 < uninformed < 0.1
 
 
 class TestConstructorGuards:
@@ -132,45 +193,30 @@ class TestConstructorGuards:
 
 
 class TestQualitativeReproduction:
-    """Tighter terminal inventory and lower PnL variance than NaiveMM, at some cost in mean PnL."""
+    """Avellaneda-Stoikov's own result, on the market it is built for.
 
-    def test_tighter_inventory_lower_pnl_variance_some_pnl_cost_vs_naive(self) -> None:
-        seeds = range(400, 425)
+    On the informed market the mid diffuses, so inventory carries real risk.
+    There A-S at the swept gamma holds inventory far tighter than NaiveMM and
+    has a far narrower PnL distribution. How it compares with the
+    constant-skew heuristic is a *result*, not an invariant: the sweep in
+    results/gamma_sweep_informed.json tunes both by the same rule on the same
+    seeds and README Results 3 and 4 report what came out. Nothing about that
+    ordering is asserted here.
+    """
 
-        def run(mm: NaiveMM | AvellanedaStoikovMM, seed: int) -> tuple[int, float]:
-            engine = Engine(
-                [mm, *_make_noise_agents(N_NOISE, seed)], reference_price=float(REFERENCE_PRICE)
-            )
-            engine.run(T)
-            return mm.inventory, mm.pnl(engine.mark)
+    SEEDS = range(400, 430)
 
-        naive_inv, naive_pnl, as_inv, as_pnl = [], [], [], []
-        for seed in seeds:
-            inv, pnl = run(
-                NaiveMM(
-                    agent_id=0, cash=1_000_000, inventory=0, quote_qty=5, half_spread_ticks=2.0
-                ),
-                seed,
-            )
-            naive_inv.append(inv)
-            naive_pnl.append(pnl)
-            inv, pnl = run(_make_as_mm(), seed)
-            as_inv.append(inv)
-            as_pnl.append(pnl)
-
-        naive_mean_abs_inv = statistics.mean(abs(x) for x in naive_inv)
-        as_mean_abs_inv = statistics.mean(abs(x) for x in as_inv)
-        naive_pnl_std = statistics.pstdev(naive_pnl)
-        as_pnl_std = statistics.pstdev(as_pnl)
-        naive_mean_pnl = statistics.mean(naive_pnl)
-        as_mean_pnl = statistics.mean(as_pnl)
-
-        assert as_mean_abs_inv < naive_mean_abs_inv, (
-            f"A-S mean|inv|={as_mean_abs_inv:.1f} not tighter than Naive={naive_mean_abs_inv:.1f}"
+    def test_tighter_inventory_and_lower_pnl_variance_than_naive(self) -> None:
+        naive = run_inventory_paths(
+            _make_naive, strategy_name="Naive", spec=INFORMED, seeds=self.SEEDS, n_ticks=T
         )
-        assert as_pnl_std < naive_pnl_std, (
-            f"A-S PnL std={as_pnl_std:.1f} not lower than Naive={naive_pnl_std:.1f}"
+        as_paths = run_inventory_paths(
+            _make_as_mm, strategy_name="A-S", spec=INFORMED, seeds=self.SEEDS, n_ticks=T
         )
-        assert as_mean_pnl < naive_mean_pnl, (
-            f"A-S mean PnL={as_mean_pnl:.1f} should cost something vs Naive={naive_mean_pnl:.1f}"
+        assert as_paths.mean_abs_inventory_over(T // 4, 3 * T // 4) < 0.25 * (
+            naive.mean_abs_inventory_over(T // 4, 3 * T // 4)
+        )
+        assert as_paths.mean_abs_inventory_at(T - 1) < naive.mean_abs_inventory_at(T - 1)
+        assert statistics.pstdev(as_paths.terminal_pnl) < 0.25 * statistics.pstdev(
+            naive.terminal_pnl
         )

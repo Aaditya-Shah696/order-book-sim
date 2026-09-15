@@ -1,0 +1,19 @@
+{
+  "n_agents": 30,
+  "n_ticks": 10000,
+  "seed": 7,
+  "reference_price": 100,
+  "two_sided_fraction": 0.9997,
+  "n_trades": 95809,
+  "trades_per_1k_ticks": 9580.9,
+  "spread_mean": 4.235270581174352,
+  "spread_min": 1,
+  "spread_max": 17,
+  "spread_first_half_mean": 4.220888355342137,
+  "spread_second_half_mean": 4.249649929985997,
+  "mark_min": 90.5,
+  "mark_max": 109.0,
+  "mark_last": 104.0,
+  "live_orders_first_half_mean": 36.4736,
+  "live_orders_second_half_mean": 36.151
+}

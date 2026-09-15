@@ -39,6 +39,9 @@ class Engine:
         self.trade_context: list[TradeContext] = []
         self.mark_log: list[MarkLogEntry] = []
         self.agent_state_log: list[AgentStateLogEntry] = []
+        self.intent_count: int = 0
+        """Every Place and Cancel applied so far: the tape's event count, for
+        matching a real event-time tape's sampling rate to this tick clock."""
         self._last_trade_price: int | None = None
 
     @property
@@ -66,7 +69,9 @@ class Engine:
     def step(self) -> None:
         for agent in self.agents:
             snapshot = self.snapshot_for(agent)
-            for intent in agent.act(snapshot):
+            intents = agent.act(snapshot)
+            self.intent_count += len(intents)
+            for intent in intents:
                 self._apply(agent, intent)
 
         final_mark = self.mark

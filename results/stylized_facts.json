@@ -1,6 +1,9 @@
 {
-  "simulated": {
-    "label": "simulated ZI market",
+  "events_per_tick_uninformed": 12.40785,
+  "events_per_tick_informed": 13.1296,
+  "lobster_events_per_bucket": 12,
+  "simulated_uninformed": {
+    "label": "sim uninformed",
     "n_observations": 19999,
     "pearson_kurtosis": 3.5861973108232927,
     "return_acf_lag1": -0.3571939560507963,
@@ -9,8 +12,18 @@
     "abs_return_acf_lag20": -0.0016552792274133294,
     "ofi_price_change_corr": 0.06402975607764452
   },
-  "lobster": {
-    "label": "LOBSTER AAPL 2012-06-21",
+  "simulated_informed": {
+    "label": "sim informed",
+    "n_observations": 19999,
+    "pearson_kurtosis": 3.6025145693529255,
+    "return_acf_lag1": -0.34482750428117054,
+    "return_acf_mean_lag2_plus": 0.0010000233708515498,
+    "abs_return_acf_lag1": 0.10605776163411126,
+    "abs_return_acf_lag20": 0.011466894093181757,
+    "ofi_price_change_corr": 0.04850396243357488
+  },
+  "lobster_event_time": {
+    "label": "LOBSTER event",
     "n_observations": 118496,
     "pearson_kurtosis": 17.847641810264914,
     "return_acf_lag1": -0.27609628979889916,
@@ -18,5 +31,15 @@
     "abs_return_acf_lag1": 0.3003370728488791,
     "abs_return_acf_lag20": 0.10915917042722142,
     "ofi_price_change_corr": 0.1756199254583646
+  },
+  "lobster_resampled": {
+    "label": "LOBSTER /12",
+    "n_observations": 9873,
+    "pearson_kurtosis": 4.799113747851318,
+    "return_acf_lag1": 0.05348285441098155,
+    "return_acf_mean_lag2_plus": 0.0028125671572957717,
+    "abs_return_acf_lag1": 0.11905004169789993,
+    "abs_return_acf_lag20": 0.05506282575792885,
+    "ofi_price_change_corr": -0.0058878277401516604
   }
 }

@@ -66,3 +66,31 @@ def load_lobster_sample(data_dir: Path) -> tuple[np.ndarray, np.ndarray]:
 
     keep = valid.to_numpy()
     return mid_prices.to_numpy()[keep], signed_volume.to_numpy(dtype=float)[keep]
+
+
+def resample_by_events(
+    mid_prices: np.ndarray, signed_volume: np.ndarray, *, events_per_bucket: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Collapse an event-time tape into buckets of ``events_per_bucket`` consecutive events.
+
+    Each bucket contributes the mid at its last event and the sum of its
+    signed volume, which is what one simulator tick records: the mark after
+    the tick's intents have been applied, and the tick's net signed volume.
+    A trailing partial bucket is dropped. Comparing an event-time tape with a
+    tick-time one without this step compares different clocks: about half of
+    LOBSTER's per-event mid changes are exactly zero, which inflates kurtosis
+    and every autocorrelation in a way that has nothing to do with the market.
+    """
+    if events_per_bucket <= 0:
+        raise ValueError(f"events_per_bucket must be positive, got {events_per_bucket}")
+    if len(mid_prices) != len(signed_volume):
+        raise ValueError("mid_prices and signed_volume must be the same length")
+    n_buckets = len(mid_prices) // events_per_bucket
+    if n_buckets == 0:
+        return np.empty(0, dtype=float), np.empty(0, dtype=float)
+    n_used = n_buckets * events_per_bucket
+    mids = np.asarray(mid_prices[:n_used], dtype=float).reshape(n_buckets, events_per_bucket)
+    volumes = np.asarray(signed_volume[:n_used], dtype=float).reshape(
+        n_buckets, events_per_bucket
+    )
+    return mids[:, -1].copy(), volumes.sum(axis=1)
