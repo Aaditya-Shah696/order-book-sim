@@ -156,7 +156,8 @@ class TestReservationPriceConvergesToMid:
         spread term was inert; it is only inert in the t -> T limit."""
         mm = _make_as_mm()
         naive = _make_naive()
-        floor_half = mm.quote(Snapshot(t=T, best_bid=None, best_ask=None, mark=0.0, my_orders=()))[1]
+        flat_snapshot = Snapshot(t=T, best_bid=None, best_ask=None, mark=0.0, my_orders=())
+        floor_half = mm.quote(flat_snapshot)[1]
         crossover = T - (2 * 2.0 - 2 * floor_half) / (mm.gamma * mm.sigma**2)
         assert 850 < crossover < 1000
 
