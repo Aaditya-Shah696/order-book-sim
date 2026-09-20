@@ -36,7 +36,8 @@ class InventoryPaths:
 
     def mean_abs_inventory(self) -> np.ndarray:
         """``mean_i |inventory[i, t]|`` for every ``t``."""
-        return np.mean(np.abs(self.inventory), axis=0)
+        result: np.ndarray = np.mean(np.abs(self.inventory), axis=0)
+        return result
 
     def mean_abs_inventory_at(self, t: int) -> float:
         return float(self.mean_abs_inventory()[t])
